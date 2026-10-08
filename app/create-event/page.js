@@ -7,7 +7,6 @@ export default function CreateEventPage() {
   const [eventName, setEventName] = useState("");
   const [eventUrl, setEventUrl] = useState("");
   const [eventDetails, setEventDetails] = useState("");
-  const [images, setImages] = useState([]);
 
   const [analysis, setAnalysis] = useState(null);
   const [eventId, setEventId] = useState(null);
@@ -18,10 +17,6 @@ export default function CreateEventPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  function handleImages(event) {
-    setImages(Array.from(event.target.files));
-  }
 
   // -----------------------------------
   // Helper: Clean AI Analysis
@@ -40,7 +35,6 @@ export default function CreateEventPage() {
 
     let cleaned = rawAnalysis.trim();
 
-    // Remove Markdown code fences
     cleaned = cleaned.replace(/^```json\s*/i, "");
     cleaned = cleaned.replace(/^```\s*/i, "");
     cleaned = cleaned.replace(/\s*```$/i, "");
@@ -106,8 +100,7 @@ export default function CreateEventPage() {
 
       setAnalysis(cleanedAnalysis);
 
-      // IMPORTANT:
-      // Save the NEWLY CREATED Supabase event ID.
+      // Save the newly created Supabase event ID
       setEventId(data.event?.id || null);
     } catch (error) {
       console.error(error);
@@ -410,69 +403,6 @@ Description: A national-level hackathon where students build innovative AI solut
                   <p className="mt-2 text-xs text-slate-600">
                     Add anything the AI should know about the event.
                   </p>
-                </div>
-
-                {/* Image Upload */}
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-200">
-                      Event images
-                    </label>
-
-                    <span className="text-xs text-slate-600">Optional</span>
-                  </div>
-
-                  <label className="group block cursor-pointer rounded-xl border border-dashed border-white/15 bg-black/10 p-6 text-center transition hover:border-blue-500/40 hover:bg-blue-500/[0.03]">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImages}
-                      className="hidden"
-                    />
-
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-xl transition group-hover:border-blue-500/30 group-hover:bg-blue-500/10">
-                      ↑
-                    </div>
-
-                    <p className="mt-4 text-sm font-medium text-slate-300">
-                      Upload event posters or banners
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-600">
-                      PNG, JPG or WEBP
-                    </p>
-                  </label>
-
-                  {images.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs font-medium text-slate-400">
-                        {images.length} image
-                        {images.length > 1 ? "s" : ""} selected
-                      </p>
-
-                      {images.map((image, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3"
-                        >
-                          <span className="max-w-[80%] truncate text-sm text-slate-300">
-                            {image.name}
-                          </span>
-
-                          <span className="text-xs text-slate-600">
-                            {(image.size / 1024 / 1024).toFixed(1)} MB
-                          </span>
-                        </div>
-                      ))}
-
-                      <p className="text-xs text-slate-600">
-                        Image-based AI understanding will be connected in the
-                        next step.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Error */}

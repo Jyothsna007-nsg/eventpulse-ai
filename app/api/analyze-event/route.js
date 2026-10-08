@@ -11,6 +11,10 @@ export async function POST(request) {
 
     const { eventName, eventUrl, eventDetails } = body;
 
+    // -----------------------------------------
+    // 1. Validate input
+    // -----------------------------------------
+
     if (!eventName && !eventUrl && !eventDetails) {
       return Response.json(
         {
@@ -21,9 +25,9 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------
-    // 1. Ask Gemini to understand event
-    // -----------------------------
+    // -----------------------------------------
+    // 2. Create AI prompt
+    // -----------------------------------------
 
     const prompt = `
 You are EventPulse AI, an event intelligence system.
@@ -41,7 +45,7 @@ ${eventDetails || "Not provided"}
 
 Create a structured event profile.
 
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON in this exact format:
 
 {
   "eventName": "",
@@ -56,11 +60,19 @@ Return ONLY valid JSON in this format:
 }
 
 Rules:
+
 - Do not invent specific facts.
-- Use information from the provided event details.
-- If something is unknown, use an empty string or empty array.
-- importantAreas should contain areas that participants could realistically give feedback about.
+- Use only the information provided.
+- If something is unknown, use an empty string.
+- If there are no items, use an empty array.
+- importantAreas should contain realistic areas that participants could give feedback about.
+- Keep the description concise.
+- Return valid JSON only.
 `;
+
+    // -----------------------------------------
+    // 3. Ask Gemini to analyze the event
+    // -----------------------------------------
 
     console.log("STEP 1: Sending request to Gemini...");
 
@@ -70,44 +82,63 @@ Rules:
     });
 
     console.log("STEP 2: Gemini response received");
-    console.log("Gemini output:", response.output_text);
 
-    const aiText = response.output_text;
+    const aiText = response.output_text || "";
 
-    // -----------------------------
-    // 2. Convert AI response to JSON
-    // -----------------------------
+    console.log("Gemini output:", aiText);
+
+    if (!aiText.trim()) {
+      return Response.json(
+        {
+          success: false,
+          error: "Gemini returned an empty response.",
+        },
+        { status: 500 },
+      );
+    }
+
+    // -----------------------------------------
+    // 4. Clean Gemini JSON response
+    // -----------------------------------------
+
+    let cleanedText = aiText.trim();
+
+    // Remove markdown JSON fences if Gemini adds them
+    cleanedText = cleanedText.replace(/^```json\s*/i, "");
+    cleanedText = cleanedText.replace(/^```\s*/i, "");
+    cleanedText = cleanedText.replace(/\s*```$/i, "");
+
+    // -----------------------------------------
+    // 5. Convert AI response to JSON
+    // -----------------------------------------
 
     let analysis;
 
     try {
-      analysis = JSON.parse(aiText);
+      analysis = JSON.parse(cleanedText);
     } catch (error) {
-      console.error("AI JSON parsing failed:", aiText);
+      console.error("AI JSON parsing failed.");
+      console.error("Gemini response:", aiText);
 
-      analysis = {
-        eventName: eventName || "",
-        eventType: "",
-        description: aiText,
-        audience: "",
-        date: "",
-        venue: "",
-        topics: [],
-        goals: [],
-        importantAreas: [],
-      };
+      return Response.json(
+        {
+          success: false,
+          error: "AI returned an invalid event profile. Please try again.",
+        },
+        { status: 500 },
+      );
     }
 
-    // -----------------------------
-    // 3. Save event to Supabase
-    // -----------------------------
     console.log("STEP 3: Gemini analysis completed");
     console.log("Analysis:", analysis);
+
+    // -----------------------------------------
+    // 6. Save event to Supabase
+    // -----------------------------------------
 
     console.log("STEP 4: Saving event to Supabase...");
 
     const { data: savedEvent, error: saveError } = await supabase
-
       .from("events")
       .insert({
         name: analysis.eventName || eventName || "Unnamed Event",
@@ -124,21 +155,24 @@ Rules:
 
         venue: analysis.venue || "",
 
-        topics: analysis.topics || [],
+        topics: Array.isArray(analysis.topics) ? analysis.topics : [],
 
-        goals: analysis.goals || [],
+        goals: Array.isArray(analysis.goals) ? analysis.goals : [],
 
-        important_areas: analysis.importantAreas || [],
+        important_areas: Array.isArray(analysis.importantAreas)
+          ? analysis.importantAreas
+          : [],
       })
       .select()
       .single();
+
     console.log("STEP 5: Supabase operation completed");
     console.log("Saved event:", savedEvent);
     console.log("Supabase error:", saveError);
 
-    // -----------------------------
-    // 4. Check Supabase error
-    // -----------------------------
+    // -----------------------------------------
+    // 7. Check Supabase error
+    // -----------------------------------------
 
     if (saveError) {
       console.error("Supabase save error:", saveError);
@@ -153,9 +187,9 @@ Rules:
       );
     }
 
-    // -----------------------------
-    // 5. Return everything
-    // -----------------------------
+    // -----------------------------------------
+    // 8. Return event + AI analysis
+    // -----------------------------------------
 
     return Response.json({
       success: true,
